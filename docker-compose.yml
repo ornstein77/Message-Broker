@@ -1,0 +1,66 @@
+services:
+  manager:
+    build: .
+    command:
+      - /app/manager
+      - -addr=:8081
+      - -registry=/data/manager/registry.json
+      - -broker=http://broker:8080
+    ports:
+      - "8081:8081"
+    volumes:
+      - manager-data:/data/manager
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  broker:
+    build: .
+    command:
+      - /app/broker
+      - -addr=:8080
+      - -data=/data/broker
+      - -id=broker-1
+      - -manager=http://manager:8081
+    environment:
+      BROKER_PUBLIC_URL: http://broker:8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - broker-data:/data/broker
+    depends_on:
+      manager:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  publisher:
+    build: .
+    profiles: ["tools"]
+    command: ["sleep", "infinity"]
+    environment:
+      BROKER_URL: http://broker:8080
+      MANAGER_URL: http://manager:8081
+    depends_on:
+      broker:
+        condition: service_healthy
+
+  subscriber:
+    build: .
+    profiles: ["tools"]
+    command: ["sleep", "infinity"]
+    environment:
+      BROKER_URL: http://broker:8080
+      MANAGER_URL: http://manager:8081
+    depends_on:
+      broker:
+        condition: service_healthy
+
+volumes:
+  broker-data:
+  manager-data:
